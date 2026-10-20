@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MiniCraft Ultra</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000;
+      color: #fff;
+    }
+    #webgl-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Crosshair */
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 10;
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+      box-shadow: 0 0 2px rgba(0,0,0,0.8);
+    }
+    #crosshair::before {
+      top: 8px; left: 0; width: 18px; height: 2px;
+    }
+    #crosshair::after {
+      top: 0; left: 8px; width: 2px; height: 18px;
+    }
+
+    /* HUD */
+    #hud {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .hud-status {
+      display: flex;
+      justify-content: space-between;
+      width: 432px;
+      margin-bottom: 6px;
+      font-size: 18px;
+      text-shadow: 2px 2px 0 #000;
+    }
+    .hearts, .hunger {
+      display: flex;
+      gap: 2px;
+    }
+    .heart, .food-icon {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+
+    /* Hotbar */
+    #hotbar {
+      display: flex;
+      background: rgba(0, 0, 0, 0.6);
+      border: 4px solid #3c3c3c;
+      border-radius: 4px;
+      padding: 2px;
+      pointer-events: auto;
+    }
+    .hotbar-slot {
+      width: 44px;
+      height: 44px;
+      border: 2px solid #555;
+      background: rgba(60, 60, 60, 0.5);
+      margin: 0 2px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .hotbar-slot.active {
+      border-color: #ffffff;
+      background: rgba(120, 120, 120, 0.6);
+      box-shadow: inset 0 0 8px rgba(255,255,255,0.5);
+    }
+    .slot-icon {
+      width: 32px;
+      height: 32px;
+      background-size: cover;
+      image-rendering: pixelated;
+    }
+    .slot-count {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 1px 1px 2px #000;
+    }
+    .slot-durability {
+      position: absolute;
+      bottom: 2px;
+      left: 2px;
+      height: 3px;
+      background: #00ff00;
+      border-radius: 1px;
+    }
+
+    /* F3 Debug Info */
+    #debug-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px 12px;
+      font-size: 12px;
+      line-height: 1.4;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 10;
+      display: none;
+    }
+
+    /* Compass HUD */
+    #compass-hud {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid #666;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #compass-needle {
+      width: 4px;
+      height: 24px;
+      background: linear-gradient(to bottom, #ff3333 50%, #ffffff 50%);
+      transform-origin: center;
+      border-radius: 2px;
+    }
+
+    /* Block mining overlay / progress bar */
+    #mining-progress-container {
+      position: absolute;
+      top: 55%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 8px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid #fff;
+      border-radius: 4px;
+      display: none;
+      z-index: 10;
+    }
+    #mining-progress-bar {
+      width: 0%;
+      height: 100%;
+      background: #33ff33;
+      border-radius: 3px;
+    }
+
+    /* UI Screens / Windows */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .hidden {
+      display: none !important;
+    }
+
+    .ui-panel {
+      background: #c6c6c6;
+      border: 4px solid #373737;
+      box-shadow: inset -4px -4px 0px #555555, inset 4px 4px 0px #ffffff;
+      color: #222;
+      padding: 16px;
+      border-radius: 2px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .ui-panel h2 {
+      text-align: center;
+      margin-bottom: 12px;
+      color: #222;
+      text-shadow: 1px 1px 0 #fff;
+    }
+
+    /* Main Menu */
+    #main-menu-panel {
+      width: 360px;
+      text-align: center;
+    }
+    .menu-title {
+      font-size: 28px;
+      font-weight: bold;
+      color: #ffcc00;
+      text-shadow: 2px 2px 0 #000;
+      margin-bottom: 20px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      background: #999999;
+      border: 3px solid #373737;
+      box-shadow: inset -2px -2px 0px #555, inset 2px 2px 0px #fff;
+      color: #000;
+      font-weight: bold;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #aaaaaa;
+    }
+    .btn:active {
+      box-shadow: inset 2px 2px 0px #555, inset -2px -2px 0px #fff;
+    }
+
+    /* Inventory Window */
+    #inventory-window {
+      width: 520px;
+    }
+    .inv-section {
+      margin-bottom: 12px;
+    }
+    .inv-title {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #333;
+    }
+    .inv-grid {
+      display: grid;
+      grid-template-columns: repeat(9, 44px);
+      gap: 4px;
+    }
+    .inv-slot {
+      width: 44px;
+      height: 44px;
+      background: #8b8b8b;
+      border: 2px solid #373737;
+      box-shadow: inset 2px 2px 0px #373737, inset -2px -2px 0px #ffffff;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .inv-slot:hover {
+      background: #9f9f9f;
+    }
+    .inv-slot.selected {
+      border-color: #ffff00;
+    }
+
+    /* Crafting Area */
+    .crafting-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .craft-grid-3x3 {
+      display: grid;
+      grid-template-columns: repeat(3, 44px);
+      gap: 4px;
+    }
+    .craft-arrow {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    /* Furnace Area */
+    .furnace-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    /* Mobile Controls Overlay */
+    #mobile-controls {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 20;
+      display: none;
+    }
+    .touch-zone {
+      position: absolute;
+      pointer-events: auto;
+    }
+    #joystick-base {
+      bottom: 20px;
+      left: 20px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+    }
+    #joystick-stick {
+      position: absolute;
+      top: 35px;
+      left: 35px;
+      width: 50px;
+      height: 50px;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+    }
+    #mobile-actions {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .mobile-btn {
+      width: 56px;
+      height: 56px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+    }
+
+    /* Tooltip */
+    #tooltip {
+      position: absolute;
+      background: rgba(16, 0, 16, 0.9);
+      border: 2px solid #280068;
+      color: #fff;
+      padding: 4px 8px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 200;
+      display: none;
+      border-radius: 3px;
+    }
+
+    /* Loading Screen */
+    #loading-screen {
+      position: absolute;
+      top:0; left:0; width: 100%; height: 100%;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+    }
+    .progress-bar-bg {
+      width: 300px;
+      height: 20px;
+      background: #333;
+      border: 2px solid #666;
+      margin-top: 15px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: #33cc33;
+      transition: width 0.2s;
+    }
+  </style>
+
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <canvas id="webgl-canvas"></canvas>
+
+  <div id="crosshair"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-status">
+      <div id="hearts-container" class="hearts"></div>
+      <div id="hunger-container" class="hunger"></div>
+    </div>
+    <div id="hotbar">
+      <!-- 9 slots generated dynamically -->
+    </div>
+  </div>
+
+  <!-- Debug F3 Overlay -->
+  <div id="debug-overlay">
+    <div><b>MiniCraft Ultra</b></div>
+    <div id="debug-fps">FPS: --</div>
+    <div id="debug-pos">XYZ: 0.0 / 0.0 / 0.0</div>
+    <div id="debug-chunk">Chunk: 0, 0</div>
+    <div id="debug-biome">Biome: --</div>
+    <div id="debug-seed">Seed: --</div>
+  </div>
+
+  <!-- Compass Overlay -->
+  <div id="compass-hud">
+    <div id="compass-needle"></div>
+  </div>
+
+  <!-- Mining progress bar -->
+  <div id="mining-progress-container">
+    <div id="mining-progress-bar"></div>
+  </div>
+
+  <!-- Tooltip -->
+  <div id="tooltip"></div>
+
+  <!-- Main Menu Modal -->
+  <div id="modal-main-menu" class="modal-overlay">
+    <div class="ui-panel" id="main-menu-panel">
+      <div class="menu-title">MINICRAFT ULTRA</div>
+      <button class="btn" id="btn-play-new">Nouveau Monde</button>
+      <button class="btn" id="btn-play-continue">Continuer</button>
+      <button class="btn" id="btn-help">Aide & Recettes</button>
+      <div style="margin-top: 10px; font-size: 11px; color: #555;">
+        Seed: <input type="text" id="input-seed" value="12345" style="width: 80px; text-align: center;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Help & Recipes Modal -->
+  <div id="modal-help" class="modal-overlay hidden">
+    <div class="ui-panel" style="width: 450px;">
+      <h2>Aide & Guide du Craft</h2>
+      <div style="font-size: 13px; line-height: 1.5; color: #333;">
+        <p><b>Contrôles PC:</b> WASD/ZQSD = Déplacement, Espace = Saut, Maj = Sprint, Ctrl = Sneak, Double-Espace = Voler, Clic G = Casser/Attaquer, Clic D = Poser/Utiliser, E = Inventaire, F3 = Debug.</p>
+        <p><b>Contrôles Mobile:</b> Joystick gauche pour bouger, glisser à droite pour tourner la caméra. Boutons d'action sur l'écran.</p>
+        <hr style="margin: 8px 0;">
+        <p><b>Recettes de base:</b></p>
+        <ul style="padding-left: 20px;">
+          <li>1 Bois → 4 Planches</li>
+          <li>2 Planches → 4 Bâtons</li>
+          <li>4 Planches → Atelier de craft (Table 3x3)</li>
+          <li>8 Pierres → Four</li>
+          <li>Outils (Pioche, Hache, Pelle, Épée) : Motif T / L avec Bâtons + (Planches/Pierre/Fer/Or/Diamant)</li>
+          <li>Torche : 1 Bâton + 1 Charbon</li>
+        </ul>
+      </div>
+      <button class="btn" id="btn-close-help" style="margin-top: 12px;">Fermer</button>
+    </div>
+  </div>
+
+  <!-- Inventory & Crafting Modal -->
+  <div id="modal-inventory" class="modal-overlay hidden">
+    <div class="ui-panel" id="inventory-window">
+      <h2 id="inv-title-text">Inventaire</h2>
+
+      <!-- Crafting Area inside inventory -->
+      <div class="crafting-container" id="crafting-area-2x2">
+        <div>
+          <div class="inv-title">Artisanat 2x2</div>
+          <div class="craft-grid-3x3" style="grid-template-columns: repeat(2, 44px);">
+            <div class="inv-slot" data-craft-slot="0"></div>
+            <div class="inv-slot" data-craft-slot="1"></div>
+            <div class="inv-slot" data-craft-slot="2"></div>
+            <div class="inv-slot" data-craft-slot="3"></div>
+          </div>
+        </div>
+        <div class="craft-arrow">➔</div>
+        <div class="inv-slot" id="craft-result-slot"></div>
+      </div>
+
+      <!-- 3x3 Crafting Workbench area (shown when clicking workbench) -->
+      <div class="crafting-container hidden" id="crafting-area-3x3">
+        <div>
+          <div class="inv-title">Table de Craft 3x3</div>
+          <div class="craft-grid-3x3">
+            <div class="inv-slot" data-craft3-slot="0"></div>
+            <div class="inv-slot" data-craft3-slot="1"></div>
+            <div class="inv-slot" data-craft3-slot="2"></div>
+            <div class="inv-slot" data-craft3-slot="3"></div>
+            <div class="inv-slot" data-craft3-slot="4"></div>
+            <div class="inv-slot" data-craft3-slot="5"></div>
+            <div class="inv-slot" data-craft3-slot="6"></div>
+            <div class="inv-slot" data-craft3-slot="7"></div>
+            <div class="inv-slot" data-craft3-slot="8"></div>
+          </div>
+        </div>
+        <div class="craft-arrow">➔</div>
+        <div class="inv-slot" id="craft3-result-slot"></div>
+      </div>
+
+      <!-- Furnace Area -->
+      <div class="furnace-container hidden" id="furnace-area">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="inv-slot" id="furnace-input-slot" title="Ingrédient (Minerai / Sable / Viande)"></div>
+          <div class="inv-slot" id="furnace-fuel-slot" title="Combustible (Charbon / Bois / Planche)"></div>
+        </div>
+        <div style="text-align: center;">
+          <div id="furnace-progress-text" style="font-size: 11px;">0%</div>
+          <div class="craft-arrow">➔</div>
+        </div>
+        <div class="inv-slot" id="furnace-output-slot"></div>
+      </div>
+
+      <!-- Main Inventory slots (27 slots) -->
+      <div class="inv-section">
+        <div class="inv-title">Inventaire (27)</div>
+        <div class="inv-grid" id="main-inventory-grid">
+          <!-- 27 slots dynamically generated -->
+        </div>
+      </div>
+
+      <!-- Hotbar slots in inventory view (9 slots) -->
+      <div class="inv-section">
+        <div class="inv-title">Barre d'accès rapide</div>
+        <div class="inv-grid" id="inv-hotbar-grid">
+          <!-- 9 hotbar slots -->
+        </div>
+      </div>
+
+      <button class="btn" id="btn-close-inventory" style="margin-top: 8px;">Fermer (E)</button>
+    </div>
+  </div>
+
+  <!-- Death Screen Modal -->
+  <div id="modal-death" class="modal-overlay hidden">
+    <div class="ui-panel" style="text-align: center; width: 320px; background: #3a0000; border-color: #880000; color: #fff;">
+      <h1 style="color: #ff3333; text-shadow: 2px 2px 0 #000;">TU ES MORT !</h1>
+      <p style="margin: 15px 0;">Vous avez succombé à vos blessures.</p>
+      <button class="btn" id="btn-respawn" style="background: #aa2222; color: #fff;">Réapparaître</button>
+    </div>
+  </div>
+
+  <!-- Mobile Controls Overlay -->
+  <div id="mobile-controls">
+    <div id="joystick-base" class="touch-zone">
+      <div id="joystick-stick"></div>
+    </div>
+    <div id="mobile-actions">
+      <div class="mobile-btn" id="btn-mobile-jump">SAUT</div>
+      <div class="mobile-btn" id="btn-mobile-fly">VOL</div>
+      <div class="mobile-btn" id="btn-mobile-break">CASSER</div>
+      <div class="mobile-btn" id="btn-mobile-place">POSER</div>
+      <div class="mobile-btn" id="btn-mobile-inv">SAC</div>
+    </div>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <h2 style="color: #fff;">Génération du monde...</h2>
+    <div class="progress-bar-bg">
+      <div id="loading-progress" class="progress-bar-fill"></div>
+    </div>
+    <p id="loading-status" style="color: #aaa; margin-top: 10px; font-size: 13px;">Initialisation des textures...</p>
+  </div>
+
+  <!-- Game Scripts -->
+  <script src="textures.js"></script>
+  <script src="biomes.js"></script>
+  <script src="chunks.js"></script>
+  <script src="physique.js"></script>
+  <script src="joueur.js"></script>
+  <script src="controles.js"></script>
+  <script src="inventaire.js"></script>
+  <script src="craft.js"></script>
+  <script src="mobs.js"></script>
+  <script src="audio.js"></script>
+  <script src="sauvegarde.js"></script>
+  <script src="ui.js"></script>
+  <script src="moteur.js"></script>
+</body>
+</html>
